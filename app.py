@@ -118,8 +118,7 @@ async def dashboard(request: Request):
     online = sum(1 for s in snapshots if s.get("status") == "online")
     total = len(snapshots)
 
-    return templates.TemplateResponse("dashboard.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "dashboard.html", {
         "snapshots": snapshots,
         "months": months,
         "online": online,
@@ -148,8 +147,7 @@ async def trigger_collect():
 @app.get("/grids", response_class=HTMLResponse)
 async def grids_page(request: Request):
     grids = get_all_grids()
-    return templates.TemplateResponse("grids.html", {
-        "request": request,
+    return templates.TemplateResponse(request, "grids.html", {
         "grids": grids,
     })
 
