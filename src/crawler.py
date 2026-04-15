@@ -95,7 +95,7 @@ def _looks_like_plaintext(content: str) -> bool:
     lines = content.strip().split("\n")
     if len(lines) < 2:
         return False
-    kv_lines = sum(1 for l in lines[:20] if re.match(r"^[\w\s._-]+\s*[=:]\s*.+", l))
+    kv_lines = sum(1 for l in lines[:20] if re.match(r"^[\w\s._(),-]+\s*[=:]\s*.+", l))
     html_tags = sum(1 for l in lines[:20] if re.search(r"<\w+[\s>]", l))
     return kv_lines >= 2 and html_tags == 0
 
@@ -115,9 +115,9 @@ def _parse_plaintext(content: str) -> dict:
         line = line.strip()
         if not line:
             continue
-        m = re.match(r"^([\w\s._-]+?)\s*[=:]\s*(.+)$", line)
+        m = re.match(r"^([\w\s._(),-]+?)\s*[=:]\s*(.+)$", line)
         if m:
-            key = m.group(1).strip().lower().replace(" ", "_").replace("-", "_")
+            key = m.group(1).strip()
             val = m.group(2).strip()
             kv[key] = val
     return _normalize(kv)
@@ -133,8 +133,9 @@ def _parse_diva_wifi(content: str) -> dict:
     # Regex patterns for stats commonly found in WiFi pages
     patterns = [
         (r"(?:total\s+)?regions?\s*[:\-=]\s*(\d[\d,]*)", "total_regions"),
-        (r"(?:online\s+(?:users?|now)|users?\s+online|online\s+now)\s*[:\-=]\s*(\d[\d,]*)", "online_users_now"),
-        (r"active\s+users?\s*(?:\(?\s*30\s*d(?:ays?)?\s*\)?)?\s*[:\-=]\s*(\d[\d,]*)", "active_users_30d"),
+        (r"(?:grid\s+size\s*\(regions?\))\s*[:\-=]\s*(\d[\d,]*)", "total_regions"),
+        (r"(?:online\s+(?:users?|now)|users?\s+(?:in\s+world|online)|online\s+now)\s*[:\-=]\s*(\d[\d,]*)", "online_users_now"),
+        (r"(?:active\s+users?|unique\s+visitors?)\s*(?:\([^)]*\))?\s*[:\-=]\s*(\d[\d,]*)", "active_users_30d"),
         (r"(?:total\s+)?(?:registered\s+)?users?\s*[:\-=]\s*(\d[\d,]*)", "total_users"),
         (r"(?:total\s+)?(?:land|area)\s*(?:\(?\s*sq\.?\s*m\s*\)?)?\s*[:\-=]\s*(\d[\d,]*)", "land_sqm"),
     ]
@@ -150,11 +151,11 @@ def _parse_diva_wifi(content: str) -> dict:
             if len(cells) >= 2:
                 key = cells[0].get_text(strip=True).lower()
                 val = cells[1].get_text(strip=True).replace(",", "")
-                if "region" in key:
+                if "region" in key or "grid size" in key:
                     kv.setdefault("total_regions", val)
-                elif "online" in key:
+                elif "online" in key or "in world" in key:
                     kv.setdefault("online_users_now", val)
-                elif "active" in key:
+                elif "active" in key or "visitor" in key:
                     kv.setdefault("active_users_30d", val)
                 elif "user" in key or "account" in key:
                     kv.setdefault("total_users", val)
@@ -179,24 +180,30 @@ _FIELD_MAP = {
     "regions": "total_regions", "total_regions": "total_regions",
     "totalregions": "total_regions", "region_count": "total_regions",
     "regioncount": "total_regions", "num_regions": "total_regions",
+    "grid_size": "total_regions", "worlds": "total_regions",
     "active_users": "active_users_30d", "active_users_30d": "active_users_30d",
     "activeusers30d": "active_users_30d", "active_users_last_30_days": "active_users_30d",
     "active30d": "active_users_30d", "monthly_active_users": "active_users_30d",
+    "unique_visitors": "active_users_30d", "unique_visitors_last_30_days": "active_users_30d",
     "online_users": "online_users_now", "online_users_now": "online_users_now",
     "onlineusers": "online_users_now", "users_online": "online_users_now",
     "online_now": "online_users_now", "online": "online_users_now",
+    "users_in_world": "online_users_now",
     "total_users": "total_users", "totalusers": "total_users",
     "users": "total_users", "user_count": "total_users",
     "registered_users": "total_users", "accounts": "total_users",
     "land_sqm": "land_sqm", "land_area": "land_sqm",
     "total_land": "land_sqm", "land": "land_sqm", "area_sqm": "land_sqm",
+    "total_land_sqm": "land_sqm",
 }
 
 
 def _normalize(raw: dict) -> dict:
     out = {}
     for key, val in raw.items():
-        canonical = key.lower().strip().replace(" ", "_").replace("-", "_")
+        # Strip parenthetical qualifiers: "Active Users (30 days)" → "Active Users"
+        canonical = re.sub(r"\s*\([^)]*\)", "", key)
+        canonical = canonical.lower().strip().replace(" ", "_").replace("-", "_")
         field = _FIELD_MAP.get(canonical)
         if field:
             out[field] = _to_int(val)
@@ -209,6 +216,9 @@ def _to_int(val) -> int | None:
     if isinstance(val, (int, float)):
         return int(val)
     try:
-        return int(str(val).replace(",", "").replace(" ", "").strip())
+        # Extract leading number, ignoring trailing units like "sqm", "km²"
+        s = str(val).replace(",", "").strip()
+        m = re.match(r"^(\d+)", s)
+        return int(m.group(1)) if m else None
     except (ValueError, TypeError):
         return None
