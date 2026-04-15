@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}HB Grid Stats{% endblock %}</title>
+  <link rel="stylesheet" href="/hb/static/style.css">
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1><span>HB</span> Grid Stats Collector</h1>
+      <nav>
+        <a href="/hb/" class="{% if active == 'dashboard' %}active{% endif %}">Dashboard</a>
+        <a href="/hb/grids" class="{% if active == 'grids' %}active{% endif %}">Manage Grids</a>
+      </nav>
+    </div>
+  </header>
+  <div class="container">
+    {% block content %}{% endblock %}
+  </div>
+  <footer>
+    Built by <a href="https://thinkneo.ai">ThinkNEO</a> for
+    <a href="https://hypergridbusiness.com">Hypergrid Business</a>
+    &middot; <a href="https://github.com/thinkneo-ai/hb-grid-stats-collector">GitHub</a>
+  </footer>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

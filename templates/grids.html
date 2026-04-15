@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% set active = "grids" %}
+{% block title %}Manage Grids — HB Grid Stats{% endblock %}
+
+{% block content %}
+<h2 style="font-size: 1.2rem; margin-bottom: 20px">Manage Grids</h2>
+
+<!-- Add grid form -->
+<div style="background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 24px">
+  <h3 style="font-size: 0.95rem; margin-bottom: 12px">Add a New Grid</h3>
+  <form method="POST" action="/hb/grids/add" class="form-row">
+    <div class="form-group">
+      <label for="name">Grid Name</label>
+      <input type="text" id="name" name="name" placeholder="e.g. OSgrid" required>
+    </div>
+    <div class="form-group">
+      <label for="url">Stats URL</label>
+      <input type="url" id="url" name="url" placeholder="http://grid.example.com:8002/wifi" required style="min-width: 320px">
+    </div>
+    <div class="form-group">
+      <label for="format">Format</label>
+      <select id="format" name="format">
+        <option value="auto" selected>Auto-detect</option>
+        <option value="diva_wifi">Diva WiFi (HTML)</option>
+        <option value="plaintext">Plain text (grid_info)</option>
+        <option value="json">JSON API</option>
+      </select>
+    </div>
+    <div class="form-group" style="justify-content: end">
+      <button type="submit" class="btn btn-primary">Add Grid</button>
+    </div>
+  </form>
+
+  <!-- Test URL -->
+  <div style="margin-top: 8px; border-top: 1px solid var(--border); padding-top: 12px">
+    <form id="test-form" class="form-row" onsubmit="return testGrid(event)">
+      <div class="form-group">
+        <label for="test-url">Test a URL before adding</label>
+        <input type="url" id="test-url" placeholder="Paste grid URL here..." style="min-width: 360px">
+      </div>
+      <div class="form-group" style="justify-content: end">
+        <button type="submit" class="btn" id="test-btn">Test</button>
+      </div>
+    </form>
+    <div class="test-result" id="test-result"></div>
+  </div>
+</div>
+
+<!-- Grid list -->
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Grid Name</th>
+        <th>URL</th>
+        <th>Format</th>
+        <th>Enabled</th>
+        <th>Added</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for g in grids %}
+      <tr style="{% if not g.enabled %}opacity: 0.5{% endif %}">
+        <td><strong>{{ g.name }}</strong></td>
+        <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis">
+          <a href="{{ g.url }}" target="_blank" style="color: var(--primary); text-decoration: none">{{ g.url }}</a>
+        </td>
+        <td>{{ g.format }}</td>
+        <td>
+          <form method="POST" action="/hb/grids/toggle/{{ g.id }}" style="margin:0; display:inline">
+            <button type="submit" class="btn btn-sm">
+              {% if g.enabled %}Enabled{% else %}Disabled{% endif %}
+            </button>
+          </form>
+        </td>
+        <td>{{ g.added_at | ftime }}</td>
+        <td>
+          <form method="POST" action="/hb/grids/remove/{{ g.id }}" style="margin:0; display:inline"
+                onsubmit="return confirm('Remove {{ g.name }}?')">
+            <button type="submit" class="btn btn-sm btn-danger">Remove</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function testGrid(e) {
+  e.preventDefault();
+  const url = document.getElementById('test-url').value.trim();
+  if (!url) return false;
+
+  const btn = document.getElementById('test-btn');
+  const result = document.getElementById('test-result');
+  btn.textContent = 'Testing...';
+  btn.disabled = true;
+  result.className = 'test-result show';
+  result.innerHTML = 'Fetching and parsing...';
+
+  try {
+    const form = new FormData();
+    form.append('url', url);
+    const resp = await fetch('/hb/grids/test', { method: 'POST', body: form });
+    const data = await resp.json();
+
+    if (data.status === 'online') {
+      result.innerHTML = '<strong style="color:var(--success)">Online!</strong> Parsed fields:' +
+        '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+    } else {
+      result.innerHTML = '<strong style="color:var(--danger)">Error:</strong> ' +
+        (data.error_msg || 'Could not parse') +
+        '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+    }
+  } catch (err) {
+    result.innerHTML = '<strong style="color:var(--danger)">Request failed:</strong> ' + err.message;
+  }
+  btn.textContent = 'Test';
+  btn.disabled = false;
+  return false;
+}
+</script>
+{% endblock %}
