@@ -1,0 +1,17 @@
+services:
+  hb-stats:
+    build: .
+    container_name: hb-grid-stats
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8051:8051"
+    volumes:
+      - ./data:/app/data
+      - ./exports:/app/exports
+    environment:
+      - TZ=UTC
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8051/health')"]
+      interval: 60s
+      timeout: 10s
+      retries: 3

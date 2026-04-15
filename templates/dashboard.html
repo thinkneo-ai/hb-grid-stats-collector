@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% set active = "dashboard" %}
+{% block title %}Dashboard — HB Grid Stats{% endblock %}
+
+{% block content %}
+<!-- Stats bar -->
+<div class="stats-bar">
+  <div class="stat-card">
+    <div class="label">Grids Monitored</div>
+    <div class="value">{{ total }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Online Now</div>
+    <div class="value" style="color: var(--success)">{{ online }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Last Collection</div>
+    <div class="value" style="font-size: 1rem">
+      {% if last_collection and last_collection.finished_at %}
+        {{ last_collection.finished_at | ftime }}
+        <br><small style="color:var(--muted)">({{ last_collection.trigger }})</small>
+      {% else %}
+        Never
+      {% endif %}
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="label">Next Auto-Collect</div>
+    <div class="value" style="font-size: 1rem">{{ next_collection }}</div>
+  </div>
+</div>
+
+<!-- Actions -->
+<div class="actions">
+  <form method="POST" action="/hb/collect" style="margin:0">
+    <button type="submit" class="btn btn-primary" {% if collecting %}disabled{% endif %}>
+      {% if collecting %}Collecting...{% else %}Collect All Now{% endif %}
+    </button>
+  </form>
+
+  {% if months %}
+  <a href="/hb/export/csv{% if months %}?month={{ months[0] }}{% endif %}" class="btn">Download CSV</a>
+  <a href="/hb/export/markdown{% if months %}?month={{ months[0] }}{% endif %}" class="btn">Download Markdown Table</a>
+  <a href="/hb/export/html{% if months %}?month={{ months[0] }}{% endif %}" class="btn">Download HTML Table</a>
+  <a href="/hb/export/json{% if months %}?month={{ months[0] }}{% endif %}" class="btn">Download JSON</a>
+  {% endif %}
+</div>
+
+<!-- Grid stats table -->
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Status</th>
+        <th>Grid</th>
+        <th>Regions</th>
+        <th>Active Users (30d)</th>
+        <th>Online Now</th>
+        <th>Total Users</th>
+        <th>Land</th>
+        <th>Last Collected</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in snapshots %}
+      <tr>
+        <td><span class="dot {{ s.status or 'unknown' }}"></span>{{ s.status or 'pending' }}</td>
+        <td><strong>{{ s.name }}</strong></td>
+        <td>{{ s.total_regions | fnum }}</td>
+        <td>{{ s.active_users_30d | fnum }}</td>
+        <td>{{ s.online_users_now | fnum }}</td>
+        <td>{{ s.total_users | fnum }}</td>
+        <td>{{ s.land_sqm | fland }}</td>
+        <td>{{ s.collected_at | ftime }}</td>
+      </tr>
+      {% endfor %}
+      {% if not snapshots %}
+      <tr>
+        <td colspan="8" style="text-align:center; padding:32px; color:var(--muted)">
+          No data yet. Click <strong>Collect All Now</strong> to run the first collection.
+        </td>
+      </tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
+
+{% if months and months | length > 1 %}
+<div style="margin-top: 24px">
+  <h3 style="font-size: 1rem; margin-bottom: 8px">Previous Months</h3>
+  <div style="display: flex; gap: 8px; flex-wrap: wrap">
+    {% for m in months %}
+    <a href="/hb/export/csv?month={{ m }}" class="btn btn-sm">{{ m }} (CSV)</a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}
